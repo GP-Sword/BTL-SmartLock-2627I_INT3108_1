@@ -1,5 +1,6 @@
-# Foundation: firmware khởi động, test hook và đường vết hoạt động.
+# Foundation: firmware khởi động và bản build `test` bật test hook.
 # Chạy với bản build `test`. OWNER: foundation.
+# Lưu ý: Wokwi chưa đưa input serial vào RX của Blue Pill, nên scenario không dùng write-serial.
 name: 'Boot + test hook'
 version: 1
 author: 'foundation'
@@ -7,9 +8,3 @@ author: 'foundation'
 steps:
   - wait-serial: 'SMARTLOCK READY 72MHz'
   - wait-serial: 'TEST HOOKS ON'
-  # Phím ảo qua UART -> xKeypadQueue -> Task 2 lấy ra -> vết "KEY 5"
-  - write-serial: '5'
-  - wait-serial: 'KEY 5'
-  # Lệnh ảo cho Task 3 -> vết "ACT:UNLOCK"
-  - write-serial: 'u'
-  - wait-serial: 'ACT:UNLOCK'

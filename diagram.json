@@ -9,7 +9,7 @@
     {"type": "wokwi-servo", "id": "servo", "top": -350, "left": 190, "attrs": {}},
     {"type": "wokwi-logic-analyzer", "id": "la", "top": -215, "left": 205, "attrs": {}},
     {"type": "wokwi-pushbutton", "id": "btn_emergency", "top": -105, "left": 170, "attrs": {"color": "red", "label": "EMERGENCY"}},
-    {"type": "wokwi-slide-switch", "id": "door", "top": -45, "left": 169, "attrs": {"value": "0"}},
+    {"type": "wokwi-slide-switch", "id": "door", "top": -45, "left": 169, "attrs": {}},
     {"type": "wokwi-buzzer", "id": "buzzer", "top": -54, "left": 250, "attrs": {"volume": "0.1"}},
     {"type": "wokwi-resistor", "id": "r_led", "top": 43.71, "left": -98.8, "attrs": {"value": "220"}},
     {"type": "wokwi-led", "id": "led_green", "top": -30, "left": -135, "attrs": {"color": "green"}}

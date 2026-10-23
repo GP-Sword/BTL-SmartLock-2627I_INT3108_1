@@ -1,0 +1,9 @@
+{
+    "recommendations": [
+        "wokwi.wokwi-vscode",
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools",
+        "marus25.cortex-debug",
+        "redhat.vscode-yaml"
+    ]
+}

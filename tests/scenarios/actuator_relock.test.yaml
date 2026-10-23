@@ -1,0 +1,13 @@
+# OWNER: Task 3. Bản foundation chỉ kiểm tra khởi động.
+# Kịch bản đích:
+#   - write-serial: 'u'  -> expect-pin led_green A = 1
+#   - delay: 5500ms      -> wait-serial: 'RELOCKED', expect-pin led_green A = 0
+#   - write-serial: 'u', 'o' (cửa mở) -> delay 6000ms -> chưa RELOCKED
+#   - write-serial: 'c'  -> wait-serial: 'RELOCKED'
+name: 'Task 3 - tu khoa sau 5 s'
+version: 1
+author: 'task3'
+
+steps:
+  - wait-serial: 'SMARTLOCK READY 72MHz'
+  # TODO(Task 3)

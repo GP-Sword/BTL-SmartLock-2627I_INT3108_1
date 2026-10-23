@@ -1,0 +1,20 @@
+# Áp cho app/ và tests/. Core/ và Drivers/ có .clang-format riêng tắt định dạng
+# để không đụng mã CubeMX sinh.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterStruct: false
+  BeforeElse: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveMacros: Consecutive
+AlignConsecutiveDeclarations: false
+PointerAlignment: Right
+SortIncludes: false
+IndentCaseLabels: false

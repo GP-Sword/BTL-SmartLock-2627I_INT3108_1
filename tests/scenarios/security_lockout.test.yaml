@@ -1,0 +1,14 @@
+# OWNER: Task 2. Bản foundation chỉ kiểm tra khởi động.
+# Kịch bản đích (bản test: LOCKOUT_MS = 6000):
+#   - write-serial: '0000#'   -> wait-serial: 'LOG:FAIL'
+#   - write-serial: '1111#'   -> wait-serial: 'LOG:FAIL'
+#   - write-serial: '2222#'   -> wait-serial: 'STATE:LOCKED_OUT', 'ACT:ALARM_ON'
+#   - wait-serial: 'ACT:ALARM_OFF', 'STATE:IDLE'
+#   - write-serial: '1234#'   -> wait-serial: 'ACT:UNLOCK'
+name: 'Task 2 - khoa sau 3 lan sai'
+version: 1
+author: 'task2'
+
+steps:
+  - wait-serial: 'SMARTLOCK READY 72MHz'
+  # TODO(Task 2)

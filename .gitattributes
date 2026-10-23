@@ -1,0 +1,19 @@
+# Lưu LF trong repo, máy Windows tự đổi sang CRLF khi checkout (nếu core.autocrlf=true).
+# Nhờ vậy CubeMX trên Windows sinh CRLF cũng không tạo diff "đổi cả file".
+* text=auto
+
+*.c    text diff=cpp
+*.h    text diff=cpp
+*.s    text
+*.ld   text
+*.ioc  text
+*.json text
+*.yml  text
+*.yaml text
+*.toml text
+*.md   text
+*.sh   text eol=lf
+
+*.png  binary
+*.jpg  binary
+*.pdf  binary

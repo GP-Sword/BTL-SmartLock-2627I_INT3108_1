@@ -1,0 +1,10 @@
+# OWNER: Task 4. Bản foundation chỉ kiểm tra khởi động.
+# Kịch bản đích: dùng take-screenshot của part `lcd` để so màn hình, và
+# wait-serial dòng log có dấu thời gian "[YYYY-MM-DD HH:MM:SS] UNLOCK_OK".
+name: 'Task 4 - LCD va log'
+version: 1
+author: 'task4'
+
+steps:
+  - wait-serial: 'SMARTLOCK READY 72MHz'
+  # TODO(Task 4)

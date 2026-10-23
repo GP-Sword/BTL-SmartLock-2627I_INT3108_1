@@ -1,0 +1,14 @@
+# OWNER: Task 1. Bản foundation chỉ kiểm tra khởi động.
+# Task 1 thay các bước TODO bằng kịch bản thật (xem guide mục 8.3), ví dụ:
+#   - set-control: { part-id: btn_emergency, name: pressed, value: 1 }
+#   - delay: 100ms
+#   - set-control: { part-id: btn_emergency, name: pressed, value: 0 }
+#   - wait-serial: 'EMERGENCY'
+#   - expect-pin: { part-id: led_green, name: A, value: 1 }
+name: 'Task 1 - nut khan cap'
+version: 1
+author: 'task1'
+
+steps:
+  - wait-serial: 'SMARTLOCK READY 72MHz'
+  # TODO(Task 1)

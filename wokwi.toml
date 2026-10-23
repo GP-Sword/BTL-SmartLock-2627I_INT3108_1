@@ -1,0 +1,12 @@
+# Wokwi for VS Code: F1 -> "Wokwi: Start Simulator"
+# Build trước: cmake --preset debug && cmake --build --preset debug
+# Wokwi tự nạp lại firmware mỗi khi build xong.
+[wokwi]
+version = 1
+firmware = 'build/debug/smart_lock.elf'
+elf = 'build/debug/smart_lock.elf'
+# Debug: F1 -> "Wokwi: Start Simulator and Wait for Debugger", rồi F5 (Wokwi GDB)
+gdbServerPort = 3333
+
+# Muốn chạy bản `test` (có test hook) trong VS Code: tạm đổi 2 dòng trên thành
+# build/test/smart_lock.elf - KHÔNG commit thay đổi đó (CI tự ghi đè file này).

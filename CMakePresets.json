@@ -1,0 +1,46 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": { "major": 3, "minor": 22, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake"
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug (Wokwi, có vết)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "APP_TRACE": "ON"
+            }
+        },
+        {
+            "name": "test",
+            "displayName": "Test (scenario CI: vết + test hook, timeout ngắn)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "APP_TRACE": "ON",
+                "APP_TEST_HOOKS": "ON"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release (board thật)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "MinSizeRel",
+                "BUZZER_ACTIVE": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "debug",   "configurePreset": "debug" },
+        { "name": "test",    "configurePreset": "test" },
+        { "name": "release", "configurePreset": "release" }
+    ]
+}

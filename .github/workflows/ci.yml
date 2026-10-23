@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-tests:
+    name: host-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake -S tests/host -B build/host -G Ninja && cmake --build build/host
+      - run: ctest --test-dir build/host --output-on-failure
+
+  firmware:
+    name: firmware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '13.3.Rel1'   # cùng bản với máy dev
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Build debug
+        run: cmake --preset debug && cmake --build --preset debug
+      - name: Build release
+        run: cmake --preset release && cmake --build --preset release
+      - name: Build test
+        run: cmake --preset test && cmake --build --preset test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fw-test
+          path: build/test/smart_lock.elf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fw-release
+          path: |
+            build/release/smart_lock.elf
+            build/release/smart_lock.hex
+            build/release/smart_lock.bin
+
+  wokwi:
+    name: wokwi
+    needs: firmware
+    runs-on: ubuntu-latest
+    # PR từ fork không đọc được secret: cả nhóm làm branch trên cùng repo.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [boot, input_emergency, security_lockout, actuator_relock, ui_log]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: fw-test
+          path: build/test
+      - name: Point wokwi.toml at the test build
+        run: |
+          printf "[wokwi]\nversion = 1\nfirmware = 'build/test/smart_lock.elf'\nelf = 'build/test/smart_lock.elf'\n" > wokwi.toml
+      - uses: wokwi/wokwi-ci-action@v1
+        with:
+          token: ${{ secrets.WOKWI_CLI_TOKEN }}
+          path: .
+          timeout: 30000
+          scenario: tests/scenarios/${{ matrix.scenario }}.test.yaml

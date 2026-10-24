@@ -1,21 +1,21 @@
 # Thay <user-taskN> bằng username GitHub thật rồi bỏ dấu # ở đầu dòng.
 # GitHub tự yêu cầu review từ chủ thư mục khi PR đụng tới thư mục đó.
 #
-# /app/input/         @GP-Sword
-# /app/security/      @<user-task2>
-# /app/actuator/      @<user-task3>
-# /app/ui/            @<user-task4>
-# /tests/host/test_security.c  @<user-task2>
+/app/input/         @GP-Sword
+/app/security/      @23021941-lgtm
+/app/actuator/      @duongvuong207-coder
+/app/ui/            @trungchan75-pixel
+/tests/host/test_security.c  @23021941-lgtm
 #
 # Giao diện chung: cả nhóm review
-# /app/common/        @GP-Sword @<user-task2> @<user-task3> @<user-task4>
+/app/common/        @GP-Sword @23021941-lgtm @duongvuong207-coder @trungchan75-pixel
 #
 # Chỉ foundation owner sửa
-# /smart_lock.ioc     @GP-Sword
-# /Core/              @GP-Sword
-# /Drivers/           @GP-Sword
-# /cmake/             @GP-Sword
-# /CMakeLists.txt     @GP-Sword
-# /CMakePresets.json  @GP-Sword
-# /diagram.json       @GP-Sword
-# /.github/           @GP-Sword
+/smart_lock.ioc     @GP-Sword
+/Core/              @GP-Sword
+/Drivers/           @GP-Sword
+/cmake/             @GP-Sword
+/CMakeLists.txt     @GP-Sword
+/CMakePresets.json  @GP-Sword
+/diagram.json       @GP-Sword
+/.github/           @GP-Sword

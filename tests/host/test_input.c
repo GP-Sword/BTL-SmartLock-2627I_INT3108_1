@@ -203,6 +203,14 @@ static void test_door_open_then_close(void)
 }
 
 /* ---- khẩn cấp ------------------------------------------------------------ */
+/* Nhả ổn định: đủ mẫu "nhả" để nút nạp lại (không đổi đồng hồ). */
+static void emerg_release(unsigned n)
+{
+    for (unsigned i = 0; i < n; i++) {
+        InputCore_EmergencyLevel(0);
+    }
+}
+
 static void test_emergency_first_press_accepted_even_at_tick_0(void)
 {
     InputEvt_t e;
@@ -237,6 +245,7 @@ static void test_emergency_accepted_at_window(void)
     fake_time_set(1000);
     InputCore_OnEmergency();
     fake_time_advance(EMERG_DEBOUNCE_MS);
+    emerg_release(DOOR_DEBOUNCE_SAMPLES);
     InputCore_OnEmergency();
     TEST_ASSERT_EQUAL(2, count_events());
 }
@@ -248,6 +257,7 @@ static void test_dropped_irq_does_not_shift_window(void)
     fake_time_advance(EMERG_DEBOUNCE_MS / 2u);
     InputCore_OnEmergency(); /* bị bỏ, không dời mốc */
     fake_time_advance(EMERG_DEBOUNCE_MS / 2u);
+    emerg_release(DOOR_DEBOUNCE_SAMPLES);
     InputCore_OnEmergency(); /* đúng t + EMERG_DEBOUNCE_MS */
     TEST_ASSERT_EQUAL(2, count_events());
 }
@@ -271,8 +281,44 @@ static void test_emergency_survives_tick_wrap(void)
     InputCore_OnEmergency();
     TEST_ASSERT_EQUAL(1, count_events());
     fake_time_advance(1u + EMERG_DEBOUNCE_MS); /* qua tràn 32 bit */
+    emerg_release(DOOR_DEBOUNCE_SAMPLES);
     InputCore_OnEmergency();
     TEST_ASSERT_EQUAL(2, count_events());
+}
+
+static void test_emergency_hold_long_then_release_bounce_sends_one(void)
+{
+    fake_time_set(1000);
+    InputCore_OnEmergency();
+    for (unsigned i = 0; i < 100; i++) { /* giữ nút ~1 s */
+        fake_time_advance(KEYPAD_SCAN_MS);
+        InputCore_EmergencyLevel(1);
+    }
+    fake_time_advance(1000u);
+    InputCore_OnEmergency(); /* cạnh rung khi nhả, chưa có mẫu nhả ổn định */
+    TEST_ASSERT_EQUAL(1, count_events());
+}
+
+static void test_emergency_rearms_after_stable_release(void)
+{
+    fake_time_set(1000);
+    InputCore_OnEmergency();
+    emerg_release(DOOR_DEBOUNCE_SAMPLES);
+    fake_time_advance(EMERG_DEBOUNCE_MS);
+    InputCore_OnEmergency();
+    TEST_ASSERT_EQUAL(2, count_events());
+}
+
+static void test_emergency_not_rearmed_by_short_release(void)
+{
+    fake_time_set(1000);
+    InputCore_OnEmergency();
+    emerg_release(DOOR_DEBOUNCE_SAMPLES - 1u);
+    InputCore_EmergencyLevel(1); /* nhấn lại: đếm về 0 */
+    emerg_release(DOOR_DEBOUNCE_SAMPLES - 1u);
+    fake_time_advance(EMERG_DEBOUNCE_MS);
+    InputCore_OnEmergency();
+    TEST_ASSERT_EQUAL(1, count_events());
 }
 
 /* ---- hàng đợi đầy -------------------------------------------------------- */
@@ -308,6 +354,9 @@ int main(void)
     RUN_TEST(test_dropped_irq_does_not_shift_window);
     RUN_TEST(test_emergency_sets_flag_and_event);
     RUN_TEST(test_emergency_survives_tick_wrap);
+    RUN_TEST(test_emergency_hold_long_then_release_bounce_sends_one);
+    RUN_TEST(test_emergency_rearms_after_stable_release);
+    RUN_TEST(test_emergency_not_rearmed_by_short_release);
     RUN_TEST(test_queue_full_does_not_crash);
     return TEST_END();
 }

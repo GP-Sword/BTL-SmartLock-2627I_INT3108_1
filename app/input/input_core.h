@@ -41,4 +41,8 @@ void InputCore_Tick(char rawKey, uint8_t doorOpen);
  * (lần đầu luôn nhận; ngắt bị bỏ không dời mốc); g_emergencyReq = 1 rồi Q_SendInput({EVT_EMERGENCY}). */
 void InputCore_OnEmergency(void);
 
+/* Gọi mỗi nhịp quét. pressed = 1 khi nút khẩn cấp đang nhấn (LOW). Khi
+ * DOOR_DEBOUNCE_SAMPLES mẫu "nhả" liên tiếp thì nút được nạp lại (armed). */
+void InputCore_EmergencyLevel(uint8_t pressed);
+
 #endif /* INPUT_CORE_H */

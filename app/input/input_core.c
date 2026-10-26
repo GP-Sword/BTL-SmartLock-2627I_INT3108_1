@@ -78,6 +78,11 @@ void InputCore_Tick(char rawKey, uint8_t doorOpen)
     }
 }
 
+void InputCore_EmergencyLevel(uint8_t pressed)
+{
+    (void)pressed;
+}
+
 void InputCore_OnEmergency(void)
 {
     if (s_emergSeen && app_elapsed_ms(s_emergLast) < EMERG_DEBOUNCE_MS) {

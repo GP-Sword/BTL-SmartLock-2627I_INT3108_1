@@ -13,6 +13,11 @@ static Debounce_t s_door;
 static volatile uint8_t  s_emergSeen;
 static volatile uint32_t s_emergLast;
 
+/* Nút chỉ được nhận khi armed: = 1 sau Init, về 0 khi nhận một lần nhấn, về 1 lại khi mức
+ * "nhả" ổn định DOOR_DEBOUNCE_SAMPLES mẫu liên tiếp (chặn cạnh rung khi nhả sau cửa sổ 200 ms). */
+static volatile uint8_t s_emergArmed;
+static uint8_t          s_emergRelCnt; /* chỉ ghi ngoài ngắt */
+
 /* ---- Chống rung ---------------------------------------------------------- */
 void debounce_init(Debounce_t *d, uint8_t initial)
 {
@@ -60,6 +65,8 @@ void InputCore_Init(uint8_t doorOpen)
     debounce_init(&s_door, doorOpen ? 1u : 0u);
     s_emergSeen = 0u;
     s_emergLast = 0u;
+    s_emergArmed = 1u;
+    s_emergRelCnt = 0u;
     door_publish(doorOpen);
 }
 
@@ -80,15 +87,26 @@ void InputCore_Tick(char rawKey, uint8_t doorOpen)
 
 void InputCore_EmergencyLevel(uint8_t pressed)
 {
-    (void)pressed;
+    if (pressed) {
+        s_emergRelCnt = 0u;
+    } else if (!s_emergArmed) {
+        if (++s_emergRelCnt >= DOOR_DEBOUNCE_SAMPLES) {
+            s_emergRelCnt = 0u;
+            s_emergArmed  = 1u;
+        }
+    }
 }
 
 void InputCore_OnEmergency(void)
 {
+    if (!s_emergArmed) {
+        return;
+    }
     if (s_emergSeen && app_elapsed_ms(s_emergLast) < EMERG_DEBOUNCE_MS) {
         return;
     }
-    s_emergSeen = 1u;
+    s_emergSeen  = 1u;
+    s_emergArmed = 0u;
     s_emergLast = app_now_ms();
     g_emergencyReq = 1u;
     InputEvt_t evt = { .type = EVT_EMERGENCY, .key = 0 };

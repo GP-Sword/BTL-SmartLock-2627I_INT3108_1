@@ -72,6 +72,7 @@ void Input_Process(void)
     }
     s_scanT0 = app_now_ms();
     InputCore_Tick(keypad_scan_raw(), door_is_open());
+    InputCore_EmergencyLevel(HAL_GPIO_ReadPin(BTN_EMERG_GPIO_Port, BTN_EMERG_Pin) == GPIO_PIN_RESET);
 }
 
 void Input_OnEmergencyIrq(void)

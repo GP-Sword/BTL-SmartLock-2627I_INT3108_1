@@ -104,6 +104,7 @@ Callback HAL (`HAL_GPIO_EXTI_Callback`, `HAL_TIM_PeriodElapsedCallback`, `HAL_UA
 | `app/security/` | Task 2 | Logic thuần, không include HAL |
 | `app/actuator/` | Task 3 | |
 | `app/ui/` | Task 4 | `ui`, `logger`, `uart_port`, (+ `sw_rtc`, driver LCD) |
+| `tests/host/test_input.c` | Task 1 | |
 | `tests/host/test_security.c` | Task 2 | |
 | `tests/scenarios/<task>.test.yaml` | Task tương ứng | |
 | `app/common/`, `Core/`, `Drivers/`, `cmake/`, `CMakeLists.txt`, `CMakePresets.json`, `smart_lock.ioc`, `diagram.json`, `.github/` | foundation | Chỉ sửa qua PR `iface/...` |
@@ -116,7 +117,7 @@ Callback HAL (`HAL_GPIO_EXTI_Callback`, `HAL_TIM_PeriodElapsedCallback`, `HAL_UA
 | --- | --- |
 | `xTaskCreate(fn…)`, vòng `for(;;)` trong task | Ruột vòng lặp chuyển vào `Xxx_Process()`; phần khởi tạo vào `Xxx_Init()`. Biến cục bộ của task → `static` trong file |
 | `void setup()` / `void loop()` (Arduino) | `setup` → `Xxx_Init()`, `loop` → `Xxx_Process()` |
-| `vTaskDelay`, `vTaskDelayUntil(&t, 20)` | `if (app_elapsed_ms(t0) >= KEYPAD_SCAN_MS) { t0 += KEYPAD_SCAN_MS; ... }` |
+| `vTaskDelay`, `vTaskDelayUntil(&t, 20)` | `if (app_elapsed_ms(t0) >= KEYPAD_SCAN_MS) { t0 += KEYPAD_SCAN_MS; ... }` (quét keypad dùng `t0 = app_now_ms()` để không quét dồn khi vòng lặp trễ; `t0 += ...` vẫn đúng cho việc cần chu kỳ cố định) |
 | `HAL_Delay(ms)`, `delay(ms)` trong logic | `SoftTimer_t` + máy trạng thái nhỏ (ghi bước hiện tại vào biến `static`) |
 | `HAL_Delay` trong chuỗi khởi tạo thiết bị (LCD) | Giữ nguyên, chỉ trong `Xxx_Init()` (chạy trước vòng lặp) |
 | `delayMicroseconds`, chờ vài µs | Vòng `__NOP()` ngắn, chỉ cho chờ < 50 µs |
@@ -224,6 +225,11 @@ CI (`.github/workflows/ci.yml`): `host-tests` → `firmware` (build 3 preset) �
 
 Hàm phải cài (`input.h`): `Input_Init()`, `Input_Process()`, `Input_OnEmergencyIrq()` (chạy trong ngắt).
 
+Task 1 tách làm hai: `input.c` là lớp HAL mỏng (quét keypad, đọc PB10, chia nhịp `KEYPAD_SCAN_MS`), còn
+`input_core.c/.h` là logic thuần không include HAL (chống rung, gửi sự kiện, cờ `g_doorOpen`/`g_emergencyReq`).
+Nhờ vậy toàn bộ logic chạy được trong unit test host `tests/host/test_input.c`; keypad và công tắc cửa không
+điều khiển được bằng `set-control` của Wokwi nên chỉ kiểm bằng unit test này, scenario chỉ kiểm nút khẩn cấp.
+
 Hành vi:
 
 - Keymap: `BOARD_KEYMAP` (hàng R1..R4 = `{'1','2','3','A'}` … `{'*','0','#','D'}`). Hàng PA0–PA3 open-drain
@@ -231,11 +237,13 @@ Hành vi:
 - Mỗi `KEYPAD_SCAN_MS` (10 ms): kéo lần lượt từng hàng xuống LOW, chờ vài µs (`__NOP`), đọc 4 cột; cột LOW = phím
   đang nhấn. Trả hàng về HIGH sau khi đọc.
 - Chống rung: giống nhau `KEY_DEBOUNCE_SAMPLES` lần liên tiếp mới chấp nhận; chỉ gửi ở **cạnh nhấn**
-  (0 → phím): `Q_SendInput({EVT_KEY, k})`. Giữ phím không lặp.
+  (0 → phím): `Q_SendInput({EVT_KEY, k})`. Giữ phím không lặp; đổi thẳng từ phím này sang phím khác (không qua
+  trạng thái nhả ổn định) thì không gửi sự kiện.
 - Cửa PB10 (`DOOR_SW`): LOW = đóng (`BOARD_DOOR_CLOSED_LEVEL`), chống rung `DOOR_DEBOUNCE_SAMPLES` lần cùng nhịp
   10 ms. Khi trạng thái ổn định đổi: ghi `g_doorOpen` **trước**, rồi gửi `EVT_DOOR_OPEN`/`EVT_DOOR_CLOSED`.
 - `Input_Init()`: đọc trạng thái cửa ban đầu, ghi `g_doorOpen`, gửi một sự kiện cửa.
 - `Input_OnEmergencyIrq()`: bỏ qua nếu cách lần trước < `EMERG_DEBOUNCE_MS` (dùng `HAL_GetTick`/`app_now_ms`);
+  "lần trước" là lần được **nhận** gần nhất, ngắt bị bỏ không dời mốc; lần đầu luôn được nhận;
   `g_emergencyReq = 1`; `Q_SendInput({EVT_EMERGENCY})`.
 
 Thử riêng (preset `debug`, stub Task 2/3 của foundation): vết `KEY x`, `DOOR OPEN/CLOSED`, `EMERGENCY` do
@@ -243,8 +251,10 @@ Thử riêng (preset `debug`, stub Task 2/3 của foundation): vết `KEY x`, `D
 
 Nghiệm thu: 16/16 phím đúng ký tự; mỗi lần nhấn đúng 1 sự kiện; cửa chỉ báo khi đổi; nhấn nút khẩn cấp →
 `EMERGENCY` + LED xanh; không chờ chặn trong `Input_Process`.
-Scenario đích `input_emergency.test.yaml`: `set-control btn_emergency pressed 1` → `delay 100ms` → `pressed 0` →
-`wait-serial: 'EMERGENCY'` → `expect-pin led_green A 1`.
+Scenario đích `input_emergency.test.yaml`: `wait-serial: 'SMARTLOCK READY 72MHz'` → `wait-serial: 'DOOR CLOSED'`
+(trạng thái cửa ban đầu) → `delay 300ms` → `set-control btn_emergency pressed 1` → `wait-serial: 'EMERGENCY'` →
+`expect-pin led_green A 1` → `delay 100ms` → `pressed 0`. Chờ serial và kiểm chân nằm **trước** bước nhả nút;
+nút giữ ngắn (≪ `EMERG_DEBOUNCE_MS`) nên các cạnh rung khi nhả bị bỏ, chỉ in đúng 1 dòng `EMERGENCY`.
 
 ### Task 2 – Security (`app/security/`) · UC4, UC6, UC7, UC8 (hẹn giờ)
 

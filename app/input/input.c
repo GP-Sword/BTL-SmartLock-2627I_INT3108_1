@@ -1,7 +1,8 @@
 /**
  * @file    input.c
  * @brief   Task 1 - Lớp HAL mỏng của khối nhập liệu: quét keypad 4x4, đọc công tắc cửa PB10,
- *          chia nhịp KEYPAD_SCAN_MS rồi đưa mẫu vào input_core (chống rung, gửi sự kiện).
+ *          chia nhịp KEYPAD_SCAN_MS (mốc = app_now_ms() mỗi lần quét, không quét dồn khi vòng lặp
+ *          trễ) rồi đưa mẫu vào input_core (chống rung, gửi sự kiện).
  *          Ngắt nút khẩn cấp PB11 chỉ chuyển tiếp sang InputCore_OnEmergency().
  */
 #include "input.h"

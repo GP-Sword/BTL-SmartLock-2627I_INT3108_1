@@ -10,7 +10,7 @@ Task suy ra từ tên branch (`feat/t1-…` → Task 1) hoặc từ thư mục d
 
 | Task | Thư mục được sửa | Đặc tả |
 | --- | --- | --- |
-| 1 Input (keypad, cửa, khẩn cấp) | `app/input/`, `tests/scenarios/input_emergency.test.yaml` | `docs/GUIDE.md` §6 Task 1 |
+| 1 Input (keypad, cửa, khẩn cấp) | `app/input/`, `tests/host/test_input.c`, `tests/scenarios/input_emergency.test.yaml` | `docs/GUIDE.md` §6 Task 1 |
 | 2 Security (máy trạng thái) | `app/security/`, `tests/host/test_security.c`, `tests/scenarios/security_lockout.test.yaml` | §6 Task 2 |
 | 3 Actuator (servo, LED, buzzer) | `app/actuator/`, `tests/scenarios/actuator_relock.test.yaml` | §6 Task 3 |
 | 4 UI & Log (LCD, RTC mềm, UART) | `app/ui/`, `tests/scenarios/ui_log.test.yaml` | §6 Task 4 |

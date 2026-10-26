@@ -32,12 +32,13 @@ bool debounce_update(Debounce_t *d, uint8_t sample, uint8_t samples);
 void InputCore_Init(uint8_t doorOpen);
 
 /* Gọi mỗi KEYPAD_SCAN_MS. rawKey: ký tự phím đang nhấn, 0 nếu không có. doorOpen: 1 = mở.
- * Gửi {EVT_KEY,k} khi phím ổn định đổi từ 0 sang phím; khi cửa ổn định đổi:
+ * Gửi {EVT_KEY,k} khi phím ổn định đổi từ 0 sang phím (đổi thẳng phím này sang phím khác
+ * không gửi); khi cửa ổn định đổi:
  * ghi g_doorOpen TRƯỚC rồi gửi EVT_DOOR_OPEN / EVT_DOOR_CLOSED. */
 void InputCore_Tick(char rawKey, uint8_t doorOpen);
 
 /* Gọi từ ngắt nút khẩn cấp: bỏ nếu cách lần được nhận trước < EMERG_DEBOUNCE_MS
- * (lần đầu luôn nhận); g_emergencyReq = 1 rồi Q_SendInput({EVT_EMERGENCY}). */
+ * (lần đầu luôn nhận; ngắt bị bỏ không dời mốc); g_emergencyReq = 1 rồi Q_SendInput({EVT_EMERGENCY}). */
 void InputCore_OnEmergency(void);
 
 #endif /* INPUT_CORE_H */

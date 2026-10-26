@@ -41,5 +41,7 @@ add_test(NAME security COMMAND test_security)
 
 add_executable(test_input test_input.c ${APP}/input/input_core.c)
 target_include_directories(test_input PRIVATE ${APP}/input)
+# --wrap: test chặn Q_SendInput để thấy giá trị cờ ngay lúc gửi sự kiện (thứ tự ghi cờ / gửi).
+target_link_options(test_input PRIVATE -Wl,--wrap=Q_SendInput)
 target_link_libraries(test_input PRIVATE app_common)
 add_test(NAME input COMMAND test_input)

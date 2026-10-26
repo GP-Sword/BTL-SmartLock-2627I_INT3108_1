@@ -9,6 +9,23 @@
 #include "input_core.h"
 #include "queues.h"
 
+/* Chặn Q_SendInput (link --wrap) để ghi lại cờ ngay lúc sự kiện được gửi. */
+bool __real_Q_SendInput(InputEvt_t evt);
+bool __wrap_Q_SendInput(InputEvt_t evt);
+
+static uint8_t s_doorAtSend = 0xFFu;
+static uint8_t s_emergAtSend = 0xFFu;
+
+bool __wrap_Q_SendInput(InputEvt_t evt)
+{
+    if (evt.type == EVT_DOOR_OPEN || evt.type == EVT_DOOR_CLOSED) {
+        s_doorAtSend = g_doorOpen;
+    } else if (evt.type == EVT_EMERGENCY) {
+        s_emergAtSend = g_emergencyReq;
+    }
+    return __real_Q_SendInput(evt);
+}
+
 /* Xả hàng đợi bằng fifo_pop để không phụ thuộc TRACE của Q_RecvInput. */
 static bool pop(InputEvt_t *e)
 {
@@ -171,12 +188,19 @@ static void test_door_needs_n_samples(void)
 
 static void test_door_sets_flag_before_event(void)
 {
-    InputEvt_t e;
-    g_doorOpen = 0;
+    s_doorAtSend = 0xFFu;
     tick(0, 1, DOOR_DEBOUNCE_SAMPLES);
-    TEST_ASSERT_TRUE(pop(&e));
-    TEST_ASSERT_EQUAL(EVT_DOOR_OPEN, e.type);
-    TEST_ASSERT_EQUAL(1, g_doorOpen); /* đã có khi sự kiện nhìn thấy được */
+    TEST_ASSERT_EQUAL(1, s_doorAtSend); /* cờ đã = 1 lúc gửi EVT_DOOR_OPEN */
+    tick(0, 0, DOOR_DEBOUNCE_SAMPLES);
+    TEST_ASSERT_EQUAL(0, s_doorAtSend); /* cờ đã = 0 lúc gửi EVT_DOOR_CLOSED */
+}
+
+static void test_door_init_sets_flag_before_event(void)
+{
+    s_doorAtSend = 0xFFu;
+    queues_init();
+    InputCore_Init(1);
+    TEST_ASSERT_EQUAL(1, s_doorAtSend);
 }
 
 static void test_door_bounce_rejected(void)
@@ -266,9 +290,11 @@ static void test_emergency_sets_flag_and_event(void)
 {
     InputEvt_t e;
     g_emergencyReq = 0;
+    s_emergAtSend = 0xFFu;
     fake_time_set(500);
     InputCore_OnEmergency();
     TEST_ASSERT_EQUAL(1, g_emergencyReq);
+    TEST_ASSERT_EQUAL(1, s_emergAtSend); /* cờ đã = 1 lúc gửi EVT_EMERGENCY */
     TEST_ASSERT_TRUE(pop(&e));
     TEST_ASSERT_EQUAL(EVT_EMERGENCY, e.type);
 }
@@ -282,6 +308,20 @@ static void test_emergency_survives_tick_wrap(void)
     TEST_ASSERT_EQUAL(1, count_events());
     fake_time_advance(1u + EMERG_DEBOUNCE_MS); /* qua tràn 32 bit */
     emerg_release(DOOR_DEBOUNCE_SAMPLES);
+    InputCore_OnEmergency();
+    TEST_ASSERT_EQUAL(2, count_events());
+}
+
+/* Tràn tick NẰM TRONG cửa sổ: mốc ở 0xFFFFFFF0, now = mốc + 100 đã tràn về 0x54. */
+static void test_emergency_window_across_wrap(void)
+{
+    fake_time_set(0xFFFFFFF0u);
+    InputCore_OnEmergency();
+    emerg_release(DOOR_DEBOUNCE_SAMPLES); /* armed lại: chỉ còn cửa sổ thời gian chặn */
+    fake_time_advance(100u);
+    InputCore_OnEmergency();
+    TEST_ASSERT_EQUAL(1, count_events());
+    fake_time_advance(EMERG_DEBOUNCE_MS - 100u);
     InputCore_OnEmergency();
     TEST_ASSERT_EQUAL(2, count_events());
 }
@@ -346,6 +386,7 @@ int main(void)
     RUN_TEST(test_door_init_publishes_once);
     RUN_TEST(test_door_needs_n_samples);
     RUN_TEST(test_door_sets_flag_before_event);
+    RUN_TEST(test_door_init_sets_flag_before_event);
     RUN_TEST(test_door_bounce_rejected);
     RUN_TEST(test_door_open_then_close);
     RUN_TEST(test_emergency_first_press_accepted_even_at_tick_0);
@@ -354,6 +395,7 @@ int main(void)
     RUN_TEST(test_dropped_irq_does_not_shift_window);
     RUN_TEST(test_emergency_sets_flag_and_event);
     RUN_TEST(test_emergency_survives_tick_wrap);
+    RUN_TEST(test_emergency_window_across_wrap);
     RUN_TEST(test_emergency_hold_long_then_release_bounce_sends_one);
     RUN_TEST(test_emergency_rearms_after_stable_release);
     RUN_TEST(test_emergency_not_rearmed_by_short_release);

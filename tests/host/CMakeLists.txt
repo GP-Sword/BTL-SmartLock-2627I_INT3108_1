@@ -38,3 +38,8 @@ add_test(NAME common COMMAND test_common)
 add_executable(test_security test_security.c ${APP}/security/security.c)
 target_link_libraries(test_security PRIVATE app_common)
 add_test(NAME security COMMAND test_security)
+
+add_executable(test_input test_input.c ${APP}/input/input_core.c)
+target_include_directories(test_input PRIVATE ${APP}/input)
+target_link_libraries(test_input PRIVATE app_common)
+add_test(NAME input COMMAND test_input)

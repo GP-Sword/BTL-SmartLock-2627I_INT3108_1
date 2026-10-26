@@ -1,14 +1,32 @@
-# OWNER: Task 1. Bản foundation chỉ kiểm tra khởi động.
-# Task 1 thay các bước TODO bằng kịch bản thật (xem guide mục 8.3), ví dụ:
-#   - set-control: { part-id: btn_emergency, name: pressed, value: 1 }
-#   - delay: 100ms
-#   - set-control: { part-id: btn_emergency, name: pressed, value: 0 }
-#   - wait-serial: 'EMERGENCY'
-#   - expect-pin: { part-id: led_green, name: A, value: 1 }
+# OWNER: Task 1. Chạy với bản build `test`.
+# Chỉ kiểm nút khẩn cấp: keypad và công tắc cửa không điều khiển được bằng set-control nên
+# được kiểm bằng unit test tests/host/test_input.c. Serial RX của Blue Pill chưa chạy trên
+# Wokwi nên không dùng write-serial.
+# Thứ tự: wait-serial và expect-pin nằm TRƯỚC bước nhả nút, không delay xen giữa nhấn và
+# wait-serial, để không dựa vào việc Wokwi CLI có đệm serial hay không. Nút giữ ngắn
+# (<< EMERG_DEBOUNCE_MS = 200 ms) nên các cạnh rung khi nhả rơi vào cửa sổ chống rung và
+# bị bỏ: chỉ in đúng 1 dòng EMERGENCY. Không giữ nút lâu hơn, và không thêm delay > 5 s sau
+# EMERGENCY (sau khi Task 3 merge, LED xanh tự tắt sau RELOCK_MS).
 name: 'Task 1 - nut khan cap'
 version: 1
 author: 'task1'
 
 steps:
   - wait-serial: 'SMARTLOCK READY 72MHz'
-  # TODO(Task 1)
+  # Input_Init báo trạng thái cửa ban đầu (slide switch mặc định nối GND = đóng)
+  - wait-serial: 'DOOR CLOSED'
+  - delay: 300ms
+  - set-control:
+      part-id: btn_emergency
+      name: pressed
+      value: 1
+  - wait-serial: 'EMERGENCY'
+  - expect-pin:
+      part-id: led_green
+      name: A
+      value: 1
+  - delay: 100ms
+  - set-control:
+      part-id: btn_emergency
+      name: pressed
+      value: 0

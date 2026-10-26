@@ -3,6 +3,9 @@
  * @brief   Task 1 - Logic thuần của khối nhập liệu: chống rung phím/cửa/nút khẩn cấp.
  *          OWNER: Task 1.
  *
+ * Nút khẩn cấp: ngắt chỉ được nhận khi qua EMERG_DEBOUNCE_MS VÀ nút đã "nạp lại" (nhả ổn định,
+ * xem InputCore_EmergencyLevel), để cạnh rung khi nhả một nút giữ lâu không sinh lần nhận thứ hai.
+ *
  * KHÔNG include HAL: input.c (lớp HAL mỏng) đọc chân rồi đưa mẫu vào đây,
  * nên toàn bộ logic chạy được trong unit test trên PC (tests/host/test_input.c).
  */

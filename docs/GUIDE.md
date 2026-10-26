@@ -243,7 +243,9 @@ Hành vi:
   10 ms. Khi trạng thái ổn định đổi: ghi `g_doorOpen` **trước**, rồi gửi `EVT_DOOR_OPEN`/`EVT_DOOR_CLOSED`.
 - `Input_Init()`: đọc trạng thái cửa ban đầu, ghi `g_doorOpen`, gửi một sự kiện cửa.
 - `Input_OnEmergencyIrq()`: bỏ qua nếu cách lần trước < `EMERG_DEBOUNCE_MS` (dùng `HAL_GetTick`/`app_now_ms`);
-  "lần trước" là lần được **nhận** gần nhất, ngắt bị bỏ không dời mốc; lần đầu luôn được nhận;
+  "lần trước" là lần được **nhận** gần nhất, ngắt bị bỏ không dời mốc; lần đầu luôn được nhận. Nút chỉ được nhận
+  lại sau khi nhả ổn định (`DOOR_DEBOUNCE_SAMPLES` nhịp quét liên tiếp ở mức nhả, `Input_Process` đọc PB11 rồi gọi
+  `InputCore_EmergencyLevel()`) và qua `EMERG_DEBOUNCE_MS`, nên giữ nút lâu rồi nhả không sinh lần thứ hai;
   `g_emergencyReq = 1`; `Q_SendInput({EVT_EMERGENCY})`.
 
 Thử riêng (preset `debug`, stub Task 2/3 của foundation): vết `KEY x`, `DOOR OPEN/CLOSED`, `EMERGENCY` do

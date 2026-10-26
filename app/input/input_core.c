@@ -1,6 +1,7 @@
 /**
  * @file    input_core.c
  * @brief   Task 1 - Logic thuần của khối nhập liệu (không HAL). Xem input_core.h.
+ *          Nút khẩn cấp dùng cờ armed: nhận một lần nhấn thì tắt, chỉ bật lại sau mẫu "nhả" ổn định.
  */
 #include "input_core.h"
 

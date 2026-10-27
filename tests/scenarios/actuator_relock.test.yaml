@@ -1,9 +1,11 @@
 # OWNER: Task 3.
 # Kịch bản kiểm thử Actuator (preset test: RELOCK_MS = 5000 ms, cửa mở dừng đếm).
+# Không dùng write-serial (Wokwi Blue Pill không nhận RX) -> điều khiển bằng nút khẩn cấp + công tắc cửa.
+# Cần Task 1 (Input) đã tích hợp: ngắt PB11 đặt g_emergencyReq, quét PB10 đặt g_doorOpen.
 #
-# Kịch bản 1: u -> LED xanh sáng, 5.5 s sau RELOCKED (cửa đóng)
-# Kịch bản 2: u -> o (cửa mở) -> chờ 6 s -> LED vẫn sáng -> c (cửa đóng) -> RELOCKED
-# Kịch bản 3: e (khẩn cấp) -> LED xanh sáng, 5.5 s sau RELOCKED
+# Kịch bản 0: khởi động -> khóa, LED xanh tắt
+# Kịch bản 1: nút khẩn cấp -> LED xanh sáng ngay, 5 s sau (cửa đóng) RELOCKED, LED tắt
+# Kịch bản 2: khẩn cấp -> mở cửa -> chờ 6 s -> LED vẫn sáng -> đóng cửa -> RELOCKED
 name: 'Task 3 - tu khoa sau 5 s'
 version: 1
 author: 'task3'
@@ -11,51 +13,14 @@ author: 'task3'
 steps:
   - wait-serial: 'SMARTLOCK READY 72MHz'
 
-  # --- Kịch bản 1: UNLOCK → tự khóa sau 5 s (cửa đóng) ---
-  - write-serial: 'u'
-  - wait-serial: 'ACT:UNLOCK'
-  - expect-pin:
-      part-id: led_green
-      pin: A
-      value: 1
-  - delay: 5500ms
-  - wait-serial: 'RELOCKED'
+  # --- Kịch bản 0: khởi động ở trạng thái khóa ---
+  - delay: 300ms
   - expect-pin:
       part-id: led_green
       pin: A
       value: 0
 
-  # --- Kịch bản 2: UNLOCK, cửa mở → không tự khóa; đóng cửa → RELOCKED ---
-  - write-serial: 'u'
-  - wait-serial: 'ACT:UNLOCK'
-  - expect-pin:
-      part-id: led_green
-      pin: A
-      value: 1
-  # Mở cửa (slide-switch đẩy lên = LOW → HIGH → g_doorOpen = 1)
-  - set-control:
-      part-id: door
-      control: position
-      value: '1'
-  - delay: 6000ms
-  # LED phải vẫn sáng (chưa RELOCKED vì cửa mở)
-  - expect-pin:
-      part-id: led_green
-      pin: A
-      value: 1
-  # Đóng cửa lại → bắt đầu đếm 5 s
-  - set-control:
-      part-id: door
-      control: position
-      value: '0'
-  - delay: 5500ms
-  - wait-serial: 'RELOCKED'
-  - expect-pin:
-      part-id: led_green
-      pin: A
-      value: 0
-
-  # --- Kịch bản 3: Nút khẩn cấp → mở khóa ngay, 5 s sau tự khóa ---
+  # --- Kịch bản 1: khẩn cấp -> mở ngay -> tự khóa sau 5 s (cửa đóng) ---
   - set-control:
       part-id: btn_emergency
       control: pressed
@@ -66,11 +31,46 @@ steps:
       control: pressed
       value: '0'
   - wait-serial: 'EMERGENCY'
+  - delay: 100ms
   - expect-pin:
       part-id: led_green
       pin: A
       value: 1
-  - delay: 5500ms
+  - wait-serial: 'RELOCKED'
+  - expect-pin:
+      part-id: led_green
+      pin: A
+      value: 0
+
+  # --- Kịch bản 2: mở khóa, cửa mở -> không tự khóa; đóng cửa -> RELOCKED ---
+  - set-control:
+      part-id: btn_emergency
+      control: pressed
+      value: '1'
+  - delay: 100ms
+  - set-control:
+      part-id: btn_emergency
+      control: pressed
+      value: '0'
+  - wait-serial: 'EMERGENCY'
+  # Mở cửa (slide-switch gạt sang 1 = PB10 HIGH -> g_doorOpen = 1), trước khi hết 5 s
+  - set-control:
+      part-id: door
+      control: position
+      value: '1'
+  - wait-serial: 'DOOR OPEN'
+  - delay: 6000ms
+  # LED phải vẫn sáng (chưa RELOCKED vì cửa mở)
+  - expect-pin:
+      part-id: led_green
+      pin: A
+      value: 1
+  # Đóng cửa lại -> bắt đầu đếm lại 5 s
+  - set-control:
+      part-id: door
+      control: position
+      value: '0'
+  - wait-serial: 'DOOR CLOSED'
   - wait-serial: 'RELOCKED'
   - expect-pin:
       part-id: led_green

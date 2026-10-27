@@ -56,9 +56,8 @@ void Actuator_Init(void)
     // Bật TIM2 chạy ngầm cho Wokwi Buzzer (gọi Actuator_OnToneTick)
     HAL_TIM_Base_Start_IT(&htim2);
 
-    // Tắt LED Xanh
-    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-    SetLockState(true);
+    // Khởi động ở trạng thái KHÓA: servo SERVO_LOCK_CCR, LED xanh tắt, không đếm tự khóa
+    SetLockState(false);
 }
 
 // ================= HÀM VÒNG LẶP CHÍNH ================= //
@@ -67,7 +66,7 @@ void Actuator_Process(void)
     /* 1. KIỂM TRA NGẮT KHẨN CẤP (UC9) */
     if (g_emergencyReq) {
         g_emergencyReq = 0u; // Xóa cờ ngay lập tức
-        SetLockState(false);  // Mở khóa, sáng LED, bắt đầu đếm tự khóa
+        SetLockState(true);   // Mở khóa, sáng LED, bắt đầu đếm tự khóa
     }
 
     /* 2. NHẬN VÀ XỬ LÝ LỆNH TỪ TASK 2 */

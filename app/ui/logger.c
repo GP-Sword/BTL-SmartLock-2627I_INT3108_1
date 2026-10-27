@@ -1,25 +1,31 @@
 /**
  * @file    logger.c
- * @brief   STUB của foundation: in "[--] UNLOCK_OK" chưa có giờ, để scenario test
- *          bắt được chuỗi UNLOCK_OK/UNLOCK_FAIL ngay từ đầu.
- *          Task 4 thay bằng RTC phần mềm (sw_rtc.c): giờ gốc + HAL_GetTick()/1000.
- *          KHÔNG bật RTC phần cứng: Wokwi không mô phỏng RTC.
+ * @brief   Task 4 - Nhật ký truy cập có dấu thời gian (UC10).
+ *          Định dạng: "[YYYY-MM-DD HH:MM:SS] UNLOCK_OK" / "UNLOCK_FAIL".
  */
 #include "logger.h"
 
+#include <stdio.h>
+
 #include "queues.h"
+#include "sw_rtc.h"
 #include "uart_port.h"
 
 void Logger_Init(void)
 {
-    /* TODO(Task 4): sw_rtc_init() từ __DATE__/__TIME__ */
+    sw_rtc_init();
 }
 
 void Logger_Process(void)
 {
     LogEvt_t evt;
     while (Q_RecvLog(&evt)) {
-        /* TODO(Task 4): "[YYYY-MM-DD HH:MM:SS] ..." */
-        uart_write((evt == LOG_UNLOCK_OK) ? "[--] UNLOCK_OK\r\n" : "[--] UNLOCK_FAIL\r\n");
+        char ts[32];
+        sw_rtc_format_timestamp(ts, sizeof(ts));
+        char line[64];
+        (void)snprintf(line, sizeof(line), "%s %s\r\n",
+                       ts,
+                       (evt == LOG_UNLOCK_OK) ? "UNLOCK_OK" : "UNLOCK_FAIL");
+        uart_write(line);
     }
 }

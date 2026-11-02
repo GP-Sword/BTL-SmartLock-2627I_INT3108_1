@@ -48,7 +48,9 @@ typedef enum {
     UI_GRANTED,
     UI_LOCKED,          /* dùng seconds */
     UI_DOOR_AJAR,
-    UI_ADMIN            /* dùng pinLen (số chữ số PIN mới) */
+    UI_ADMIN,           /* dùng pinLen (số chữ số PIN mới) */
+    UI_DENIED,          /* dùng pinLen = số lần thử còn lại */
+    UI_ADMIN_LOGIN      /* dùng pinLen (số chữ số PIN đang gõ để vào admin) */
 } UIScreen_t;
 
 typedef struct {

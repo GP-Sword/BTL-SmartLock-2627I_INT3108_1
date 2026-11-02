@@ -102,6 +102,8 @@ static void test_names(void)
     TEST_ASSERT_EQUAL_STRING("UNLOCK", act_name(ACT_UNLOCK));
     TEST_ASSERT_EQUAL_STRING("ALARM_OFF", act_name(ACT_ALARM_OFF));
     TEST_ASSERT_EQUAL_STRING("DOOR_AJAR", ui_name(UI_DOOR_AJAR));
+    TEST_ASSERT_EQUAL_STRING("DENIED", ui_name(UI_DENIED));
+    TEST_ASSERT_EQUAL_STRING("ADMIN_LOGIN", ui_name(UI_ADMIN_LOGIN));
 }
 
 /* ---- soft_timer ---------------------------------------------------------- */

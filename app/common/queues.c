@@ -54,6 +54,8 @@ const char *ui_name(UIScreen_t screen)
     case UI_LOCKED:    return "LOCKED";
     case UI_DOOR_AJAR: return "DOOR_AJAR";
     case UI_ADMIN:     return "ADMIN";
+    case UI_DENIED:    return "DENIED";
+    case UI_ADMIN_LOGIN: return "ADMIN_LOGIN";
     default:           return "?";
     }
 }
@@ -100,6 +102,8 @@ bool Q_SendUI(UIScreen_t screen, uint16_t value)
     switch (screen) {
     case UI_ENTER_PIN:
     case UI_ADMIN:
+    case UI_DENIED:
+    case UI_ADMIN_LOGIN:
         msg.pinLen = (uint8_t)value;
         TRACE("UI:%s %u", ui_name(screen), (unsigned)value);
         break;

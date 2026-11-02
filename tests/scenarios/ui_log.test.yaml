@@ -11,3 +11,4 @@ steps:
   # - wait-serial: 'UNLOCK_OK'
   - take-screenshot:
       part-id: lcd
+      save-to: build/ui_log_lcd.png

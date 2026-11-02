@@ -24,12 +24,12 @@ steps:
   - set-control:
       part-id: btn_emergency
       control: pressed
-      value: '1'
+      value: 1
   - delay: 100ms
   - set-control:
       part-id: btn_emergency
       control: pressed
-      value: '0'
+      value: 0
   - wait-serial: 'EMERGENCY'
   - delay: 100ms
   - expect-pin:
@@ -46,18 +46,18 @@ steps:
   - set-control:
       part-id: btn_emergency
       control: pressed
-      value: '1'
+      value: 1
   - delay: 100ms
   - set-control:
       part-id: btn_emergency
       control: pressed
-      value: '0'
+      value: 0
   - wait-serial: 'EMERGENCY'
   # Mở cửa (slide-switch gạt sang 1 = PB10 HIGH -> g_doorOpen = 1), trước khi hết 5 s
   - set-control:
       part-id: door
       control: position
-      value: '1'
+      value: 1
   - wait-serial: 'DOOR OPEN'
   - delay: 6000ms
   # LED phải vẫn sáng (chưa RELOCKED vì cửa mở)
@@ -69,7 +69,7 @@ steps:
   - set-control:
       part-id: door
       control: position
-      value: '0'
+      value: 0
   - wait-serial: 'DOOR CLOSED'
   - wait-serial: 'RELOCKED'
   - expect-pin:

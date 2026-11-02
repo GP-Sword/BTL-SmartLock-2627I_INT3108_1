@@ -72,6 +72,25 @@ static void format_screen(const UIMsg_t *msg)
         }
         break;
 
+    case UI_DENIED: {
+        char buf[17];
+        memcpy(s_want[0], "ACCESS DENIED   ", 16u);
+        (void)snprintf(buf, sizeof(buf), "RETRY LEFT: %-4u", (unsigned)(msg->pinLen % 100u));
+        memcpy(s_want[1], buf, 16u);
+        break;
+    }
+
+    case UI_ADMIN_LOGIN:
+        memcpy(s_want[0], "ADMIN LOGIN:    ", 16u);
+        memset(s_want[1], ' ', 16u);
+        {
+            uint8_t n = (msg->pinLen > 16u) ? 16u : msg->pinLen;
+            for (uint8_t i = 0u; i < n; i++) {
+                s_want[1][i] = '*';
+            }
+        }
+        break;
+
     default:
         break;
     }

@@ -14,10 +14,13 @@ steps:
       part-id: btn_emergency
       control: pressed
       value: 1
-  - wait-serial: 'STATE:UNLOCKED'
   - wait-serial: 'LOG:OK'
+  - wait-serial: 'STATE:UNLOCKED'
   - delay: 100ms
   - set-control:
       part-id: btn_emergency
       control: pressed
       value: 0
+  # Task 3 tự khóa sau RELOCK_MS (5 s) và báo EVT_RELOCKED -> Task 2 về IDLE
+  - wait-serial: 'RELOCKED'
+  - wait-serial: 'STATE:IDLE'

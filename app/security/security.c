@@ -30,6 +30,9 @@ static uint32_t doorSince;
 static bool     doorAlarm;
 static bool     alarmOn;
 
+static bool     deniedShown;            /* đang hiện màn ACCESS DENIED ở IDLE */
+static uint32_t deniedSince;
+
 static void buf_clear(void)
 {
     memset(buf, 0, sizeof buf);
@@ -58,16 +61,24 @@ static void set_state(SysState_t s)
 {
     if (s != state) {
         state = s;
+        deniedShown = false;
         TRACE("STATE:%s", state_name(s));
     }
+}
+
+/* Màn nhập PIN: khác nhau giữa mở cửa thường và đăng nhập admin. */
+static void ui_entering(void)
+{
+    Q_SendUI(adminLogin ? UI_ADMIN_LOGIN : UI_ENTER_PIN, bufLen);
 }
 
 /* Vẽ lại màn hình ứng với trạng thái hiện tại (dùng khi đóng cửa). */
 static void ui_redraw(void)
 {
+    deniedShown = false;
     switch (state) {
     case STATE_IDLE:         Q_SendUI(UI_IDLE, 0u); break;
-    case STATE_ENTERING_PIN: Q_SendUI(UI_ENTER_PIN, bufLen); break;
+    case STATE_ENTERING_PIN: ui_entering(); break;
     case STATE_UNLOCKED:     Q_SendUI(UI_GRANTED, 0u); break;
     case STATE_LOCKED_OUT:   Q_SendUI(UI_LOCKED, lockoutShown); break;
     case STATE_ADMIN_RESET:  Q_SendUI(UI_ADMIN, bufLen); break;
@@ -113,7 +124,7 @@ static void enter_digit(char c)
     buf_add(c);
     Q_SendAct(ACT_BEEP_TICK);
     set_state(STATE_ENTERING_PIN);
-    Q_SendUI(UI_ENTER_PIN, bufLen);
+    ui_entering();
 }
 
 static void confirm_pin(void)
@@ -143,7 +154,11 @@ static void confirm_pin(void)
     if (failCount == MAX_FAIL_COUNT) {
         start_lockout();
     } else {
-        go_idle();
+        /* Về IDLE nhưng giữ màn "ACCESS DENIED" tới phím kế tiếp. */
+        set_state(STATE_IDLE);
+        Q_SendUI(UI_DENIED, (uint16_t)(MAX_FAIL_COUNT - failCount));
+        deniedShown = true;
+        deniedSince = app_now_ms();
     }
 }
 
@@ -156,7 +171,7 @@ static void on_key_idle(char k)
         adminLogin = true;
         buf_clear();
         set_state(STATE_ENTERING_PIN);
-        Q_SendUI(UI_ENTER_PIN, 0u);
+        ui_entering();
     }
 }
 
@@ -227,6 +242,13 @@ static void on_event(const InputEvt_t *e)
 {
     switch (e->type) {
     case EVT_KEY:
+        if (deniedShown) {
+            /* Số và 'A' tự đổi sang màn của chúng; phím khác thì trả về màn chờ. */
+            deniedShown = false;
+            if (!(e->key >= '0' && e->key <= '9') && e->key != 'A') {
+                Q_SendUI(UI_IDLE, 0u);
+            }
+        }
         on_key(e->key);
         break;
     case EVT_DOOR_OPEN:
@@ -269,6 +291,11 @@ static void check_timers(void)
         }
     }
 
+    if (deniedShown && app_elapsed_ms(deniedSince) >= DENIED_SHOW_MS) {
+        deniedShown = false;
+        Q_SendUI(UI_IDLE, 0u);
+    }
+
     if (doorTimerOn && !doorAlarm && app_elapsed_ms(doorSince) >= DOOR_AJAR_MS) {
         doorAlarm = true;
         Q_SendUI(UI_DOOR_AJAR, 0u);
@@ -288,6 +315,7 @@ void Security_Init(void)
     doorTimerOn = false;
     doorAlarm = false;
     alarmOn = false;
+    deniedShown = false;
 }
 
 void Security_Process(void)

@@ -253,12 +253,87 @@ static void test_admin_login_and_cancel(void)
     int v = -1;
     press("A");
     TEST_ASSERT_EQUAL(STATE_ENTERING_PIN, Security_GetState());
-    TEST_ASSERT_TRUE(ui_seen(UI_ENTER_PIN, &v));
+    TEST_ASSERT_TRUE(ui_seen(UI_ADMIN_LOGIN, &v));
     TEST_ASSERT_EQUAL(0, v);
+    TEST_ASSERT_FALSE(ui_seen(UI_ENTER_PIN, NULL));
     press("C");
     TEST_ASSERT_EQUAL(STATE_IDLE, Security_GetState());
     press("A1*");
     TEST_ASSERT_EQUAL(STATE_IDLE, Security_GetState());
+}
+
+static void test_admin_login_digits_use_admin_screen(void)
+{
+    int v = -1;
+    press("A12");
+    TEST_ASSERT_TRUE(ui_seen(UI_ADMIN_LOGIN, &v));
+    TEST_ASSERT_EQUAL(2, v);
+    TEST_ASSERT_FALSE(ui_seen(UI_ENTER_PIN, NULL));
+    drain_all();
+    send(EVT_DOOR_OPEN);
+    send(EVT_DOOR_CLOSED);
+    TEST_ASSERT_TRUE(ui_seen(UI_ADMIN_LOGIN, &v));   /* vẽ lại đúng màn admin */
+}
+
+static void test_wrong_pin_shows_denied_with_retries(void)
+{
+    int v = -1;
+    press("9999#");
+    TEST_ASSERT_TRUE(ui_seen(UI_DENIED, &v));
+    TEST_ASSERT_EQUAL(MAX_FAIL_COUNT - 1, v);
+    press("9999#");
+    TEST_ASSERT_TRUE(ui_seen(UI_DENIED, &v));
+    TEST_ASSERT_EQUAL(MAX_FAIL_COUNT - 2, v);
+    TEST_ASSERT_EQUAL(STATE_IDLE, Security_GetState());
+}
+
+static void test_denied_returns_to_idle_after_timeout(void)
+{
+    press("9999#");
+    drain_all();
+    fake_time_advance(DENIED_SHOW_MS - 1);
+    pump();
+    TEST_ASSERT_FALSE(ui_seen(UI_IDLE, NULL));
+    fake_time_advance(1);
+    pump();
+    TEST_ASSERT_TRUE(ui_seen(UI_IDLE, NULL));
+    drain_all();
+    fake_time_advance(DENIED_SHOW_MS);
+    pump();
+    TEST_ASSERT_FALSE(ui_seen(UI_IDLE, NULL));   /* chỉ một lần */
+}
+
+static void test_denied_cleared_by_any_key(void)
+{
+    press("9999#");
+    drain_all();
+    press("#");
+    TEST_ASSERT_TRUE(ui_seen(UI_IDLE, NULL));
+    press("9999#");
+    drain_all();
+    press("5");
+    TEST_ASSERT_FALSE(ui_seen(UI_IDLE, NULL));   /* số đã tự đổi sang ENTER_PIN */
+    fake_time_advance(DENIED_SHOW_MS);
+    pump();
+    TEST_ASSERT_FALSE(ui_seen(UI_IDLE, NULL));   /* và không bị timer kéo về IDLE */
+}
+
+static void test_denied_timer_cancelled_by_emergency(void)
+{
+    press("9999#");
+    send(EVT_EMERGENCY);
+    drain_all();
+    fake_time_advance(DENIED_SHOW_MS);
+    pump();
+    TEST_ASSERT_FALSE(ui_seen(UI_IDLE, NULL));
+}
+
+static void test_last_failure_shows_locked_not_denied(void)
+{
+    press("0000#1111#");
+    drain_all();
+    press("2222#");
+    TEST_ASSERT_FALSE(ui_seen(UI_DENIED, NULL));
 }
 
 static void test_admin_wrong_pin_counts_fail(void)
@@ -412,6 +487,12 @@ int main(void)
     RUN_TEST(test_lockout_end_resets_fail_count);
     RUN_TEST(test_relocked_returns_idle);
     RUN_TEST(test_admin_login_and_cancel);
+    RUN_TEST(test_admin_login_digits_use_admin_screen);
+    RUN_TEST(test_wrong_pin_shows_denied_with_retries);
+    RUN_TEST(test_denied_returns_to_idle_after_timeout);
+    RUN_TEST(test_denied_cleared_by_any_key);
+    RUN_TEST(test_denied_timer_cancelled_by_emergency);
+    RUN_TEST(test_last_failure_shows_locked_not_denied);
     RUN_TEST(test_admin_wrong_pin_counts_fail);
     RUN_TEST(test_lockout_ignores_admin_key);
     RUN_TEST(test_admin_change_pin);

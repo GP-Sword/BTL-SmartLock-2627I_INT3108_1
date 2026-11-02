@@ -1,14 +1,26 @@
-# OWNER: Task 2. Bản foundation chỉ kiểm tra khởi động.
-# Kịch bản đích (bản test: LOCKOUT_MS = 6000):
-#   - write-serial: '0000#'   -> wait-serial: 'LOG:FAIL'
-#   - write-serial: '1111#'   -> wait-serial: 'LOG:FAIL'
-#   - write-serial: '2222#'   -> wait-serial: 'STATE:LOCKED_OUT', 'ACT:ALARM_ON'
-#   - wait-serial: 'ACT:ALARM_OFF', 'STATE:IDLE'
-#   - write-serial: '1234#'   -> wait-serial: 'ACT:UNLOCK'
-name: 'Task 2 - khoa sau 3 lan sai'
+# OWNER: Task 2.
+# Serial RX của Blue Pill chưa chạy trên Wokwi (xem input_emergency / actuator_relock) nên
+# không dùng write-serial: chuỗi PIN sai x3 -> LOCKED_OUT -> hết phạt -> PIN đúng được phủ bởi
+# unit test tests/host/test_security.c. Scenario này chỉ kiểm đường khẩn cấp qua phần cứng
+# (cần Task 1 Input đã tích hợp: PB11 -> g_emergencyReq + EVT_EMERGENCY).
+name: 'Task 2 - khan cap mo khoa'
 version: 1
 author: 'task2'
 
 steps:
   - wait-serial: 'SMARTLOCK READY 72MHz'
-  # TODO(Task 2)
+  - delay: 300ms
+  - set-control:
+      part-id: btn_emergency
+      control: pressed
+      value: 1
+  - wait-serial: 'LOG:OK'
+  - wait-serial: 'STATE:UNLOCKED'
+  - delay: 100ms
+  - set-control:
+      part-id: btn_emergency
+      control: pressed
+      value: 0
+  # Task 3 tự khóa sau RELOCK_MS (5 s) và báo EVT_RELOCKED -> Task 2 về IDLE
+  - wait-serial: 'RELOCKED'
+  - wait-serial: 'STATE:IDLE'

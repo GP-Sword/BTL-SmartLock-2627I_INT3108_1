@@ -13,6 +13,7 @@
 #define PIN_MIN_LEN             4u
 #define PIN_MAX_LEN             6u
 #define MAX_FAIL_COUNT          3u
+#define DENIED_SHOW_MS          3000u  /* màn "ACCESS DENIED" tự về IDLE sau thời gian này */
 
 /* Bản build `test` (APP_TEST_HOOKS) rút ngắn thời gian để CI chạy nhanh. */
 #ifdef APP_TEST_HOOKS

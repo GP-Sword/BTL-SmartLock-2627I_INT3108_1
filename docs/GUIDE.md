@@ -198,7 +198,7 @@ Gõ trên Serial Monitor; chữ IN HOA là phím, chữ thường là lệnh:
 | Khởi động (`app.c`) | `SMARTLOCK READY 72MHz`, (preset test) `TEST HOOKS ON` |
 | `Q_RecvInput` | `KEY 5`, `DOOR OPEN`, `DOOR CLOSED`, `EMERGENCY`, `RELOCKED` |
 | `Q_SendAct` | `ACT:UNLOCK`, `ACT:LOCK`, `ACT:BEEP_TICK`, `ACT:ALARM_ON`, `ACT:ALARM_OFF` |
-| `Q_SendUI` | `UI:IDLE`, `UI:ENTER_PIN 3`, `UI:GRANTED`, `UI:LOCKED 57`, `UI:DOOR_AJAR`, `UI:ADMIN 2` |
+| `Q_SendUI` | `UI:IDLE`, `UI:ENTER_PIN 3`, `UI:GRANTED`, `UI:LOCKED 57`, `UI:DOOR_AJAR`, `UI:ADMIN 2`, `UI:DENIED 2`, `UI:ADMIN_LOGIN 1` |
 | `Q_SendLog` | `LOG:OK`, `LOG:FAIL` |
 | Task 2 (`TRACE` khi đổi trạng thái) | `STATE:IDLE`, `STATE:ENTERING_PIN`, `STATE:UNLOCKED`, `STATE:LOCKED_OUT`, `STATE:ADMIN_RESET` |
 | Task 4 logger (mọi preset) | `[YYYY-MM-DD HH:MM:SS] UNLOCK_OK` / `UNLOCK_FAIL` (stub hiện in `[--] UNLOCK_OK`) |
@@ -261,13 +261,13 @@ PIN chủ khởi tạo `PIN_MASTER_DEFAULT`, lưu RAM. So khớp: độ dài b�
 | Trạng thái | Sự kiện | Hành động → trạng thái |
 | --- | --- | --- |
 | IDLE | số | thêm số, `UI ENTER_PIN 1` → ENTERING_PIN |
-| IDLE | `A` | `adminLogin = 1`, `UI ENTER_PIN 0` → ENTERING_PIN |
-| ENTERING_PIN | số | thêm số, `UI ENTER_PIN len` |
+| IDLE | `A` | `adminLogin = 1`, `UI ADMIN_LOGIN 0` → ENTERING_PIN |
+| ENTERING_PIN | số | thêm số, `UI ENTER_PIN len` (khi `adminLogin`: `UI ADMIN_LOGIN len`) |
 | ENTERING_PIN | `*` | xóa, `adminLogin = 0`, `UI IDLE` → IDLE |
 | ENTERING_PIN | `C` khi `adminLogin` | xóa, `adminLogin = 0`, `UI IDLE` → IDLE |
 | ENTERING_PIN | `#` đúng, không admin | `failCount = 0`, `ACT UNLOCK`, `UI GRANTED`, `LOG OK` → UNLOCKED |
 | ENTERING_PIN | `#` đúng, `adminLogin` | `failCount = 0`, `UI ADMIN 0` → ADMIN_RESET |
-| ENTERING_PIN | `#` sai (cả khi admin) | `failCount++`, `LOG FAIL`; nếu `failCount == MAX_FAIL_COUNT` → ghi mốc, `UI LOCKED 60` → LOCKED_OUT; ngược lại `UI IDLE` → IDLE |
+| ENTERING_PIN | `#` sai (cả khi admin) | `failCount++`, `LOG FAIL`; nếu `failCount == MAX_FAIL_COUNT` → ghi mốc, `UI LOCKED 60` → LOCKED_OUT; ngược lại `UI DENIED <MAX_FAIL_COUNT - failCount>` → IDLE |
 | ADMIN_RESET | số / `*` | thêm số mới, `UI ADMIN len` / xóa số mới |
 | ADMIN_RESET | `#` với `PIN_MIN_LEN..PIN_MAX_LEN` số | lưu PIN chủ mới, `UI IDLE` → IDLE (ít hơn thì bỏ qua) |
 | ADMIN_RESET | `C` | không đổi, `UI IDLE` → IDLE |
@@ -338,6 +338,8 @@ LCD (PCF8574, `LCD_I2C_ADDR` 7-bit → HAL dùng `<< 1`, chế độ 4 bit, gi�
 | `UI_LOCKED` | `LOCKED <seconds>s` | trống |
 | `UI_DOOR_AJAR` | `DOOR AJAR` | trống |
 | `UI_ADMIN` | `ADMIN MODE` | `*` × `pinLen` |
+| `UI_DENIED` | `ACCESS DENIED` | `RETRY LEFT: <pinLen>` (số lần thử còn lại); Task 2 gửi `UI_IDLE` sau `DENIED_SHOW_MS` hoặc khi có phím |
+| `UI_ADMIN_LOGIN` | `ADMIN LOGIN:` | `*` × `pinLen` |
 
 RTC phần mềm `sw_rtc`: giờ gốc từ `__DATE__`/`__TIME__` lúc build; `now = gốc + app_now_ms()/1000`, đổi ra
 năm-tháng-ngày giờ:phút:giây (tính cả năm nhuận).

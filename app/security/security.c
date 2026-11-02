@@ -1,242 +1,306 @@
 /**
  * @file    security.c
- * @brief   STUB của foundation: chỉ lấy sự kiện ra khỏi hàng đợi (hàm Q_RecvInput
- *          tự in vết "KEY 5", "DOOR OPEN"...). Task 2 thay ruột file này.
- *
- * Việc cần làm (guide mục 7, Task 2): máy trạng thái 5 trạng thái, so khớp PIN,
- * khóa LOCKOUT_MS sau MAX_FAIL_COUNT lần sai, đổi PIN chủ, hẹn giờ cửa DOOR_AJAR_MS,
- * alarm_update() duy nhất quyết định ALARM_ON/OFF, TRACE("STATE:...") khi đổi trạng thái.
- * Chỉ include app_time.h / queues.h / app_config.h / trace.h - KHÔNG include HAL.
- */
-/**
- * @file    security.c
- * @brief   Khối Logic Bảo mật & Máy trạng thái FSM (Bare-metal Super-loop)
+ * @brief   Task 2 - máy trạng thái bảo mật (UC4, UC6, UC7, UC8 hẹn giờ).
+ *          Logic thuần: chỉ include app_time.h, queues.h, app_config.h, trace.h.
  */
 #include "security.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "app_config.h"
 #include "app_time.h"
 #include "queues.h"
 #include "trace.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdbool.h>
 
-// Biến trạng thái FSM
-static SysState_t s_state = STATE_IDLE;
+static SysState_t state = STATE_IDLE;
 
-// Dữ liệu nội bộ Task 2
-static char s_masterPIN[7] = "1234";
-static char s_inputBuffer[7] = "";
-static uint8_t s_inputIdx = 0;
-static uint8_t s_failCount = 0;
+static char    masterPin[PIN_MAX_LEN + 1u];
+static char    buf[PIN_MAX_LEN + 1u];   /* PIN đang gõ (hoặc PIN mới ở ADMIN_RESET) */
+static uint8_t bufLen;
+static uint8_t failCount;
+static bool    adminLogin;
 
-// Bộ đếm thời gian Non-blocking (dùng ms từ app_now_ms())
-static uint32_t s_lockoutStartMs = 0;
-static uint32_t s_unlockStartMs = 0;
-static bool s_doorAlarmActive = false;
+static uint32_t lockoutSince;
+static uint16_t lockoutShown;           /* số giây đã gửi lên UI gần nhất */
 
-// Trạng thái công tắc cửa (extern từ foundation hoặc cờ toàn cục)
-extern volatile bool g_doorOpen;
+static bool     doorTimerOn;
+static uint32_t doorSince;
+static bool     doorAlarm;
+static bool     alarmOn;
 
-// --- HÀM BỔ TRỢ CHUYỂN TRẠNG THÁI (Có TRACE) ---
-static void SetState(SysState_t newState) {
-    if (s_state != newState) {
-        s_state = newState;
-        switch (s_state) {
-            case STATE_IDLE:
-                TRACE("STATE: IDLE");
-                break;
-            case STATE_ENTER_PIN:
-                TRACE("STATE: ENTER_PIN");
-                break;
-            case STATE_UNLOCKED:
-                TRACE("STATE: UNLOCKED");
-                break;
-            case STATE_LOCKED_OUT:
-                TRACE("STATE: LOCKED_OUT");
-                break;
-            case STATE_CHANGE_PIN:
-                TRACE("STATE: CHANGE_PIN");
-                break;
-            default:
-                break;
-        }
+static void buf_clear(void)
+{
+    memset(buf, 0, sizeof buf);
+    bufLen = 0u;
+}
+
+static void buf_add(char c)
+{
+    buf[bufLen++] = c;
+    buf[bufLen] = '\0';
+}
+
+static const char *state_name(SysState_t s)
+{
+    switch (s) {
+    case STATE_IDLE:         return "IDLE";
+    case STATE_ENTERING_PIN: return "ENTERING_PIN";
+    case STATE_UNLOCKED:     return "UNLOCKED";
+    case STATE_LOCKED_OUT:   return "LOCKED_OUT";
+    case STATE_ADMIN_RESET:  return "ADMIN_RESET";
+    default:                 return "?";
     }
 }
 
-// Clear bộ đệm phím
-static void ResetBuffer(void) {
-    memset(s_inputBuffer, 0, sizeof(s_inputBuffer));
-    s_inputIdx = 0;
-}
-
-// Cập nhật trạng thái Còi báo động (Hàm tập trung duy nhất quyết định ALARM)
-static void Alarm_Update(void) {
-    if (s_state == STATE_LOCKED_OUT || s_doorAlarmActive) {
-        Q_SendAction(CMD_ALARM_ON);
-    } else {
-        Q_SendAction(CMD_ALARM_OFF);
+static void set_state(SysState_t s)
+{
+    if (s != state) {
+        state = s;
+        TRACE("STATE:%s", state_name(s));
     }
 }
 
-// --- XỬ LÝ SỰ KIỆN PHÍM/ĐẦU VÀO ---
-static void Security_HandleEvent(const InputEvt_t *evt) {
-    // Nếu đang bị LOCKOUT -> Bỏ qua toàn bộ phím bấm
-    if (s_state == STATE_LOCKED_OUT) {
-        return;
-    }
-
-    char key = evt->key;
-
-    // Phím '*' -> Reset nhập liệu và về IDLE ngay lập tức
-    if (key == '*') {
-        ResetBuffer();
-        SetState(STATE_IDLE);
-        Q_SendDisplay("  SMART LOCK  ", "Nhap PIN:", false, NULL);
-        Alarm_Update();
-        return;
-    }
-
-    switch (s_state) {
-        // --- TRẠNG THÁI: IDLE / NHẬP PIN MỞ CỬA ---
-        case STATE_IDLE:
-        case STATE_ENTER_PIN:
-            if (key >= '0' && key <= '9') {
-                if (s_inputIdx < 6) {
-                    s_inputBuffer[s_inputIdx++] = key;
-                    s_inputBuffer[s_inputIdx] = '\0';
-
-                    char mask[7] = "******";
-                    mask[s_inputIdx] = '\0';
-                    SetState(STATE_ENTER_PIN);
-                    Q_SendDisplay("Nhap PIN:", mask, false, NULL);
-                }
-            }
-            else if (key == '#') {
-                if (s_inputIdx > 0) {
-                    if (strcmp(s_inputBuffer, s_masterPIN) == 0) {
-                        // PIN đúng -> Mở cửa
-                        s_failCount = 0;
-                        s_unlockStartMs = app_now_ms();
-                        s_doorAlarmActive = false;
-
-                        SetState(STATE_UNLOCKED);
-                        Q_SendAction(CMD_UNLOCK_DOOR);
-                        Q_SendDisplay("MO CUA THANH CONG", "Xin chao!", true, "UNLOCK_SUCCESS");
-                    } else {
-                        // PIN sai -> Tăng đếm lỗi
-                        s_failCount++;
-                        Q_SendAction(CMD_BEEP_ERROR);
-
-                        if (s_failCount >= MAX_FAIL_COUNT) {
-                            // Vượt quá số lần sai -> Khóa hệ thống
-                            s_lockoutStartMs = app_now_ms();
-                            SetState(STATE_LOCKED_OUT);
-                            Q_SendDisplay("HE THONG BI KHOA", "Khoa 30 giay...", true, "SYSTEM_LOCKED");
-                        } else {
-                            char errStr[17];
-                            snprintf(errStr, sizeof(errStr), "Sai! Thu lai(%d/%d)", s_failCount, MAX_FAIL_COUNT);
-                            Q_SendDisplay("SAI MA PIN!", errStr, true, "WRONG_PIN");
-                        }
-                    }
-                    ResetBuffer();
-                    Alarm_Update();
-                }
-            }
-            else if (key == 'A') {
-                // Vào chế độ đổi PIN
-                SetState(STATE_CHANGE_PIN);
-                ResetBuffer();
-                Q_SendDisplay("ADMIN MODE", "Nhap PIN moi:", false, NULL);
-            }
-            break;
-
-        // --- TRẠNG THÁI: ĐỔI PIN CHỦ (UC7) ---
-        case STATE_CHANGE_PIN:
-            if (key >= '0' && key <= '9') {
-                if (s_inputIdx < 6) {
-                    s_inputBuffer[s_inputIdx++] = key;
-                    s_inputBuffer[s_inputIdx] = '\0';
-                    char mask[7] = "******";
-                    mask[s_inputIdx] = '\0';
-                    Q_SendDisplay("Nhap PIN moi:", mask, false, NULL);
-                }
-            }
-            else if (key == '#') {
-                if (s_inputIdx >= 4) {
-                    strcpy(s_masterPIN, s_inputBuffer);
-                    Q_SendDisplay("THANH CONG!", "PIN moi da luu", true, "CHANGE_PIN_OK");
-                } else {
-                    Q_SendDisplay("LOI: PIN >= 4 SO", "Huy doi PIN", false, NULL);
-                }
-                ResetBuffer();
-                SetState(STATE_IDLE);
-            }
-            else if (key == 'C') {
-                // Phím C: Hủy đổi PIN
-                ResetBuffer();
-                SetState(STATE_IDLE);
-                Q_SendDisplay("HUY DOI PIN", "Nhap PIN:", false, NULL);
-            }
-            break;
-
-        default:
-            break;
+/* Vẽ lại màn hình ứng với trạng thái hiện tại (dùng khi đóng cửa). */
+static void ui_redraw(void)
+{
+    switch (state) {
+    case STATE_IDLE:         Q_SendUI(UI_IDLE, 0u); break;
+    case STATE_ENTERING_PIN: Q_SendUI(UI_ENTER_PIN, bufLen); break;
+    case STATE_UNLOCKED:     Q_SendUI(UI_GRANTED, 0u); break;
+    case STATE_LOCKED_OUT:   Q_SendUI(UI_LOCKED, lockoutShown); break;
+    case STATE_ADMIN_RESET:  Q_SendUI(UI_ADMIN, bufLen); break;
+    default: break;
     }
 }
 
-// --- XỬ LÝ ĐỊNH THỜI VÀ TRẠNG THÁI THEO THỜI GIAN (TICK) ---
-static void Security_Tick(uint32_t nowMs) {
-    // 1. Kiểm tra hết thời gian LOCKOUT (30s)
-    if (s_state == STATE_LOCKED_OUT) {
-        if ((nowMs - s_lockoutStartMs) >= LOCKOUT_MS) {
-            s_failCount = 0;
-            SetState(STATE_IDLE);
-            Q_SendDisplay("DA MO KHOA HT", "Nhap PIN:", true, "SYSTEM_UNLOCKED");
-            Alarm_Update();
-        }
-    }
+static void go_idle(void)
+{
+    buf_clear();
+    adminLogin = false;
+    set_state(STATE_IDLE);
+    Q_SendUI(UI_IDLE, 0u);
+}
 
-    // 2. Kiểm tra Cửa mở quá 15s (DOOR_AJAR_MS)
-    if (s_state == STATE_UNLOCKED) {
-        if (g_doorOpen) {
-            if (!s_doorAlarmActive && ((nowMs - s_unlockStartMs) >= DOOR_AJAR_MS)) {
-                s_doorAlarmActive = true;
-                Q_SendDisplay("CANH BAO!", "Cua mo qua 15s!", true, "ALARM_DOOR_15S");
-                Alarm_Update();
-            }
+static void start_lockout(void)
+{
+    buf_clear();
+    adminLogin = false;
+    lockoutSince = app_now_ms();
+    lockoutShown = (uint16_t)(LOCKOUT_MS / 1000u);
+    set_state(STATE_LOCKED_OUT);
+    Q_SendUI(UI_LOCKED, lockoutShown);
+}
+
+/* Một nơi duy nhất quyết định còi báo động. */
+static void alarm_update(void)
+{
+    bool want = (state == STATE_LOCKED_OUT) || doorAlarm;
+    if (want != alarmOn) {
+        alarmOn = want;
+        Q_SendAct(want ? ACT_ALARM_ON : ACT_ALARM_OFF);
+    }
+}
+
+/* ---- Xử lý phím theo trạng thái ------------------------------------------ */
+
+static void enter_digit(char c)
+{
+    if (bufLen >= PIN_MAX_LEN) {
+        return;                         /* số thừa bỏ qua, không beep */
+    }
+    buf_add(c);
+    Q_SendAct(ACT_BEEP_TICK);
+    set_state(STATE_ENTERING_PIN);
+    Q_SendUI(UI_ENTER_PIN, bufLen);
+}
+
+static void confirm_pin(void)
+{
+    bool match = (bufLen == strlen(masterPin)) && (memcmp(buf, masterPin, bufLen) == 0);
+    bool admin = adminLogin;
+
+    buf_clear();
+    adminLogin = false;
+
+    if (match) {
+        failCount = 0u;
+        if (admin) {
+            set_state(STATE_ADMIN_RESET);
+            Q_SendUI(UI_ADMIN, 0u);
         } else {
-            // Cửa đã đóng lại -> Khóa chốt Servo & tắt alarm
-            s_doorAlarmActive = false;
-            Q_SendAction(CMD_LOCK_DOOR);
-            SetState(STATE_IDLE);
-            Q_SendDisplay("CUA DA DONG", "Nhap PIN:", false, NULL);
-            Alarm_Update();
+            Q_SendAct(ACT_UNLOCK);
+            Q_SendUI(UI_GRANTED, 0u);
+            Q_SendLog(LOG_UNLOCK_OK);
+            set_state(STATE_UNLOCKED);
+        }
+        return;
+    }
+
+    failCount++;
+    Q_SendLog(LOG_UNLOCK_FAIL);
+    if (failCount == MAX_FAIL_COUNT) {
+        start_lockout();
+    } else {
+        go_idle();
+    }
+}
+
+static void on_key_idle(char k)
+{
+    if (k >= '0' && k <= '9') {
+        enter_digit(k);
+    } else if (k == 'A') {
+        Q_SendAct(ACT_BEEP_TICK);
+        adminLogin = true;
+        buf_clear();
+        set_state(STATE_ENTERING_PIN);
+        Q_SendUI(UI_ENTER_PIN, 0u);
+    }
+}
+
+static void on_key_entering(char k)
+{
+    if (k >= '0' && k <= '9') {
+        enter_digit(k);
+    } else if (k == '*' || (k == 'C' && adminLogin)) {
+        Q_SendAct(ACT_BEEP_TICK);
+        go_idle();
+    } else if (k == '#') {
+        Q_SendAct(ACT_BEEP_TICK);
+        confirm_pin();
+    }
+}
+
+static void on_key_admin(char k)
+{
+    if (k >= '0' && k <= '9') {
+        if (bufLen < PIN_MAX_LEN) {
+            buf_add(k);
+            Q_SendAct(ACT_BEEP_TICK);
+            Q_SendUI(UI_ADMIN, bufLen);
+        }
+    } else if (k == '*') {
+        Q_SendAct(ACT_BEEP_TICK);
+        buf_clear();
+        Q_SendUI(UI_ADMIN, 0u);
+    } else if (k == '#') {
+        if (bufLen >= PIN_MIN_LEN) {
+            Q_SendAct(ACT_BEEP_TICK);
+            memcpy(masterPin, buf, bufLen + 1u);
+            go_idle();
+        }
+    } else if (k == 'C') {
+        Q_SendAct(ACT_BEEP_TICK);
+        go_idle();
+    }
+}
+
+static void on_key(char k)
+{
+    switch (state) {
+    case STATE_IDLE:         on_key_idle(k); break;
+    case STATE_ENTERING_PIN: on_key_entering(k); break;
+    case STATE_ADMIN_RESET:  on_key_admin(k); break;
+    case STATE_UNLOCKED:     break;     /* chờ EVT_RELOCKED */
+    case STATE_LOCKED_OUT:   break;     /* bỏ qua mọi phím, không beep */
+    default: break;
+    }
+}
+
+/* ---- Sự kiện không phải phím --------------------------------------------- */
+
+static void on_emergency(void)
+{
+    Q_SendLog(LOG_UNLOCK_OK);
+    Q_SendUI(UI_GRANTED, 0u);
+    if (state == STATE_LOCKED_OUT) {
+        failCount = 0u;
+    }
+    buf_clear();
+    adminLogin = false;
+    set_state(STATE_UNLOCKED);
+}
+
+static void on_event(const InputEvt_t *e)
+{
+    switch (e->type) {
+    case EVT_KEY:
+        on_key(e->key);
+        break;
+    case EVT_DOOR_OPEN:
+        doorTimerOn = true;
+        doorSince = app_now_ms();
+        break;
+    case EVT_DOOR_CLOSED:
+        doorTimerOn = false;
+        doorAlarm = false;
+        ui_redraw();
+        break;
+    case EVT_EMERGENCY:
+        on_emergency();
+        break;
+    case EVT_RELOCKED:
+        if (state == STATE_UNLOCKED) {
+            go_idle();
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* ---- Mốc thời gian -------------------------------------------------------- */
+
+static void check_timers(void)
+{
+    if (state == STATE_LOCKED_OUT) {
+        uint32_t el = app_elapsed_ms(lockoutSince);
+        if (el >= LOCKOUT_MS) {
+            failCount = 0u;
+            go_idle();
+        } else {
+            uint16_t left = (uint16_t)((LOCKOUT_MS - el + 999u) / 1000u);
+            if (left != lockoutShown) {
+                lockoutShown = left;
+                Q_SendUI(UI_LOCKED, left);
+            }
         }
     }
-}
 
-// --- PUBLIC FUNCTIONS ---
-
-void Security_Init(void) {
-    s_state = STATE_IDLE;
-    s_failCount = 0;
-    s_doorAlarmActive = false;
-    ResetBuffer();
-    TRACE("STATE: IDLE");
-}
-
-void Security_Process(void) {
-    InputEvt_t evt;
-    // Đọc toàn bộ sự kiện trong Queue
-    while (Q_RecvInput(&evt)) {
-        Security_HandleEvent(&evt);
+    if (doorTimerOn && !doorAlarm && app_elapsed_ms(doorSince) >= DOOR_AJAR_MS) {
+        doorAlarm = true;
+        Q_SendUI(UI_DOOR_AJAR, 0u);
     }
-    // Chạy kiểm tra Timer non-blocking bằng thời gian thực hệ thống
-    Security_Tick(app_now_ms());
 }
 
-SysState_t Security_GetState(void) {
-    return s_state;
+/* ---- API ------------------------------------------------------------------ */
+
+void Security_Init(void)
+{
+    state = STATE_IDLE;
+    memcpy(masterPin, PIN_MASTER_DEFAULT, sizeof PIN_MASTER_DEFAULT);
+    buf_clear();
+    failCount = 0u;
+    adminLogin = false;
+    lockoutShown = 0u;
+    doorTimerOn = false;
+    doorAlarm = false;
+    alarmOn = false;
+}
+
+void Security_Process(void)
+{
+    InputEvt_t e;
+    while (Q_RecvInput(&e)) {
+        on_event(&e);
+    }
+    check_timers();
+    alarm_update();
+}
+
+SysState_t Security_GetState(void)
+{
+    return state;
 }
